@@ -33,11 +33,15 @@ fastApi/
 │
 ├── models/                          # Esquemas Pydantic (Modelos)
 │   ├── __init__.py
-│   └── item.py                      # Modelos de Item (Create, Base, Item)
+│   └── items/                       # Módulo de modelos de Items
+│       ├── __init__.py
+│       └── item.py                  # Modelos de Item (Create, Base, Item)
 │
 ├── controllers/                     # Controladores (Lógica de peticiones)
 │   ├── __init__.py
-│   └── item_controller.py           # Controlador para Items
+│   └── item_controller/             # Módulo del controlador de Items
+│       ├── __init__.py
+│       └── item_controller.py       # Controlador para Items
 │
 ├── services/                        # Servicios (Lógica de negocio)
 │   ├── __init__.py
@@ -45,7 +49,9 @@ fastApi/
 │
 ├── routes/                          # Rutas (Definición de endpoints)
 │   ├── __init__.py
-│   └── item_routes.py               # Router para Items
+│   └── item_routes/                 # Módulo de rutas de Items
+│       ├── __init__.py
+│       └── item_routes.py           # Router para Items
 │
 ├── main.py                          # Aplicación principal
 ├── .env                             # Variables de entorno (no incluido en git)
@@ -341,9 +347,16 @@ Los errores de validación retornan código 422 con detalles del error.
 
 ### Agregar nuevos recursos (siguiendo MVC)
 
+El proyecto utiliza una estructura modular anidada. Cada recurso tiene su propio módulo dentro de models, controllers y routes.
+
 #### 1. Crear el Modelo
 ```python
-# models/user.py
+# models/users/__init__.py
+from .user import User, UserBase, UserCreate
+
+__all__ = ["User", "UserBase", "UserCreate"]
+
+# models/users/user.py
 from pydantic import BaseModel
 from uuid import UUID
 
@@ -351,48 +364,82 @@ class UserCreate(BaseModel):
     username: str
     email: str
 
-class User(UserCreate):
+class UserBase(UserCreate):
     id: UUID
+
+class User(UserBase):
+    pass
+```
+
+Luego exportar en `models/__init__.py`:
+```python
+from .users import User, UserBase, UserCreate
 ```
 
 #### 2. Crear el Servicio (Lógica de Negocio)
 ```python
 # services/user_service.py
 from supabase import Client
-from models import User, UserCreate
+from models import User, UserBase, UserCreate
 
 class UserService:
     @staticmethod
-    def create_user(user: UserCreate, db: Client) -> User:
+    def create_user(user: UserCreate, db: Client) -> UserBase:
         response = db.table("users").insert(user.model_dump()).execute()
         return response.data[0]
 ```
 
+Exportar en `services/__init__.py`:
+```python
+from .user_service import UserService
+```
+
 #### 3. Crear el Controlador
 ```python
-# controllers/user_controller.py
+# controllers/user_controller/__init__.py
+from .user_controller import UserController
+
+__all__ = ["UserController"]
+
+# controllers/user_controller/user_controller.py
 from db import DbDependency
-from models import User, UserCreate
+from models import User, UserBase, UserCreate
 from services import UserService
 
 class UserController:
     @staticmethod
-    async def create_user(user: UserCreate, db: DbDependency) -> User:
+    async def create_user(user: UserCreate, db: DbDependency) -> UserBase:
         return UserService.create_user(user, db)
+```
+
+Exportar en `controllers/__init__.py`:
+```python
+from .user_controller import UserController
 ```
 
 #### 4. Crear las Rutas
 ```python
-# routes/user_routes.py
+# routes/user_routes/__init__.py
+from .user_routes import router
+
+__all__ = ["router"]
+
+# routes/user_routes/user_routes.py
 from fastapi import APIRouter
 from controllers import UserController
-from models import User, UserCreate
+from models import User, UserBase, UserCreate
+from db import DbDependency
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-@router.post("", response_model=User)
+@router.post("", response_model=UserBase)
 async def create_user(user: UserCreate, db: DbDependency):
     return await UserController.create_user(user, db)
+```
+
+Exportar en `routes/__init__.py`:
+```python
+from .user_routes import router as user_router
 ```
 
 #### 5. Registrar el Router en main.py
@@ -403,6 +450,8 @@ from routes import item_router, user_router
 app.include_router(item_router)
 app.include_router(user_router)
 ```
+
+**Nota importante:** La estructura modular anidada permite una mejor organización cuando el proyecto crece, manteniendo cada recurso aislado en su propio módulo.
 
 ### Agregar nuevas bases de datos
 
