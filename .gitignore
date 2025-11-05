@@ -1,2 +1,18 @@
 .env
-*__pycache__*/
+
+# Coverage reports
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Test artifacts
+*.pyc
+__pycache__/
+.cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env.test

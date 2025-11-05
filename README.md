@@ -10,6 +10,7 @@ API REST moderna construida con FastAPI y Supabase para gestión de items con op
 - **UUID**: Identificadores únicos universales para los recursos
 - **Arquitectura MVC**: Separación de responsabilidades en Modelos, Vistas (Routes) y Controladores
 - **Arquitectura escalable**: Estructura modular lista para crecer
+- **Testing completo**: 22+ tests unitarios con pytest y TestClient (79% cobertura)
 
 ## Tecnologías
 
@@ -53,10 +54,22 @@ fastApi/
 │       ├── __init__.py
 │       └── item_routes.py           # Router para Items
 │
+├── tests/                           # Suite de tests
+│   ├── conftest.py                  # Fixtures compartidas
+│   ├── unit/                        # Tests unitarios
+│   │   ├── test_root.py            # Tests del endpoint root
+│   │   └── test_items.py           # Tests CRUD de items
+│   ├── integration/                 # Tests de integración
+│   └── e2e/                         # Tests end-to-end
+│
 ├── main.py                          # Aplicación principal
+├── pytest.ini                       # Configuración de pytest
+├── requirements-test.txt            # Dependencias de testing
+├── run_tests.bat / run_tests.sh     # Scripts para ejecutar tests
 ├── .env                             # Variables de entorno (no incluido en git)
 ├── .env.example                     # Plantilla de variables de entorno
 ├── requirements.txt                 # Dependencias de Python
+├── TESTING_GUIDE.md                 # Guía rápida de testing
 └── README.md                        # Este archivo
 ```
 
@@ -463,15 +476,138 @@ app.include_router(user_router)
 
 Editar `config/settings.py` y agregar nuevos campos a la clase `Settings`.
 
-## Testing (Futuro)
+## Testing
+
+La aplicación cuenta con una suite completa de tests unitarios y de integración implementada con **pytest** y **TestClient de FastAPI**.
+
+### Estructura de Tests
+
+```
+tests/
+├── conftest.py              # Fixtures compartidas (client, mocks, datos de prueba)
+├── unit/                    # Tests unitarios (usan mocks, no requieren Supabase)
+│   ├── test_root.py        # Tests del endpoint / (4 tests)
+│   └── test_items.py       # Tests CRUD de items (18 tests)
+├── integration/             # Tests de integración (requieren Supabase real)
+│   └── test_items_integration.py
+├── e2e/                     # Tests end-to-end (futuro)
+├── fixtures/                # Datos de prueba adicionales
+└── utils/                   # Utilidades para tests
+```
+
+### Instalación de Dependencias de Testing
 
 ```bash
-# Instalar dependencias de testing
-pip install pytest pytest-asyncio httpx
-
-# Ejecutar tests
-pytest
+pip install -r requirements-test.txt
 ```
+
+### Ejecutar Tests
+
+#### Comandos básicos
+
+```bash
+# Ejecutar todos los tests unitarios
+pytest tests/unit/
+
+# Ejecutar tests con output detallado
+pytest -v
+
+# Ejecutar tests con cobertura
+pytest --cov=. --cov-report=html
+
+# Ejecutar un archivo específico
+pytest tests/unit/test_items.py
+
+# Ejecutar un test específico
+pytest tests/unit/test_items.py::TestCreateItem::test_create_item_success
+```
+
+#### Scripts interactivos
+
+**Windows:**
+```bash
+run_tests.bat
+```
+
+**Linux/MacOS:**
+```bash
+chmod +x run_tests.sh
+./run_tests.sh
+```
+
+### Cobertura de Tests
+
+**Tests Implementados: 22 tests unitarios**
+
+- ✅ **Endpoint Root** (4 tests) - 100% cobertura
+- ✅ **CREATE /items** (5 tests) - Crear items, validaciones
+- ✅ **READ /items** (3 tests) - Listar items, paginación
+- ✅ **READ /items/{id}** (3 tests) - Obtener por ID, errores
+- ✅ **UPDATE /items/{id}** (3 tests) - Actualizar items
+- ✅ **DELETE /items/{id}** (2 tests) - Eliminar items
+- ✅ **Integridad** (2 tests) - Métodos HTTP, Content-Type
+
+**Cobertura Total: 79%**
+
+### Fixtures Disponibles
+
+Los tests incluyen fixtures reutilizables en `conftest.py`:
+
+- **`client`**: TestClient de FastAPI para hacer peticiones HTTP
+- **`mock_supabase_client`**: Mock de Supabase (no requiere conexión)
+- **`sample_item_data`**: Datos de ejemplo para crear items
+- **`sample_item_response`**: Item completo con ID y metadata
+- **`sample_items_list`**: Lista de múltiples items
+
+### Ejemplo de Test
+
+```python
+def test_create_item_success(client, mock_supabase_client, sample_item_data):
+    """Test que verifica la creación exitosa de un item."""
+    # Configurar el mock
+    mock_response = MagicMock()
+    mock_response.data = [sample_item_data]
+    mock_supabase_client.table.return_value.insert.return_value.execute.return_value = mock_response
+
+    # Hacer petición
+    response = client.post("/items", json=sample_item_data)
+
+    # Verificar
+    assert response.status_code == 200
+    assert response.json()["name"] == sample_item_data["name"]
+```
+
+### Tests de Integración
+
+Los tests de integración verifican la interacción real con Supabase:
+
+```bash
+# Ejecutar tests de integración (requiere Supabase configurado)
+pytest tests/integration/ -m integration
+
+# Saltar tests de integración
+pytest -m "not integration"
+```
+
+**IMPORTANTE**: Los tests de integración usan tu base de datos real. Usa una base de datos de prueba.
+
+### Documentación Completa de Testing
+
+Para más información sobre testing:
+
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Guía rápida de inicio
+- **[tests/README.md](tests/README.md)** - Documentación completa de tests
+- **[TESTS_SUMMARY.md](TESTS_SUMMARY.md)** - Resumen de implementación
+
+### Agregar Nuevos Tests
+
+Al agregar nuevas funcionalidades:
+
+1. Escribe tests primero (TDD)
+2. Ejecuta `pytest` para verificar que todos pasen
+3. Mantén la cobertura por encima del 70%
+4. Usa las fixtures existentes en `conftest.py`
+5. Documenta los tests con docstrings
 
 ## Deployment
 
@@ -540,6 +676,17 @@ pip install pydantic-settings
 - Asegúrate de que estés importando `Client` desde `supabase`, no de `postgrest`
 - Limpia la caché de Python: `find . -type d -name "__pycache__" -exec rm -rf {} +`
 
+### Error en tests: "ModuleNotFoundError"
+```bash
+# Instalar dependencias de testing
+pip install -r requirements-test.txt
+```
+
+### Tests fallan con error de conexión
+- Los **tests unitarios** NO requieren conexión a Supabase (usan mocks)
+- Los **tests de integración** SÍ requieren Supabase configurado
+- Ejecuta solo tests unitarios: `pytest tests/unit/`
+
 ## Contribuir
 
 1. Fork el proyecto
@@ -558,12 +705,22 @@ Para preguntas o sugerencias, abre un issue en el repositorio.
 
 ## Recursos Adicionales
 
+### Documentación del Proyecto
+- [TESTING_GUIDE.md](TESTING_GUIDE.md) - Guía rápida de testing
+- [tests/README.md](tests/README.md) - Documentación completa de tests
+- [TESTS_SUMMARY.md](TESTS_SUMMARY.md) - Resumen de implementación de tests
+
+### Documentación Externa
 - [Documentación de FastAPI](https://fastapi.tiangolo.com)
+- [FastAPI Testing](https://fastapi.tiangolo.com/tutorial/testing/)
 - [Documentación de Supabase](https://supabase.com/docs)
 - [Documentación de Pydantic](https://docs.pydantic.dev)
 - [Documentación de Uvicorn](https://www.uvicorn.org)
+- [Documentación de Pytest](https://docs.pytest.org/)
 - [Patrones de Arquitectura MVC](https://en.wikipedia.org/wiki/Model%E2%80%93view%E2%80%93controller)
 
 ---
 
-Desarrollado con FastAPI y Supabase
+**Stack Tecnológico:** FastAPI + Supabase + PostgreSQL + Pydantic + Pytest
+
+**Desarrollado con ❤️ usando testing moderno y arquitectura MVC**

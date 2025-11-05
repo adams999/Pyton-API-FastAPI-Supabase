@@ -1,0 +1,21 @@
+# Dependencias para testing de la aplicación FastAPI
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+
+# HTTP testing para FastAPI
+httpx>=0.24.0,<0.25.0
+
+# FastAPI y dependencias (deben estar instaladas también)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Supabase client
+supabase==2.0.3
+
+# Para variables de entorno en tests
+python-dotenv==1.0.0
